@@ -1,36 +1,25 @@
 Para problema de certificados, si se usa pipenv:
     export REQUESTS_CA_BUNDLE=./certs/anaconda.org.pem
+
 O si se usa conda:
     conda install -c conda-forge scikit-learn
 
 Esta app Flask combina Llama3.2 con RAG para subir PDFs y conversar con ellos.
     - LLM: llama3.2
-    - embeddings: FastEmbedEmbeddings
-    - vectorDB: Chroma (https://api.python.langchain.com/en/latest/vectorstores/langchain_community.vectorstores.chroma.Chroma.html)
-    - PDF handler: PDFPlumberLoader 
-
-El codigo fuente esta en: https://github.com/ThomasJay/RAG.git
-
+    - embeddings: chroma/onnx_models/all-MiniLM-L6-v2/onnx.tar.gz
+    - vectorDB: Chroma (https://docs.trychroma.com/guides#adding-data-to-a-collection)
 Para lanzar la app:
     - python app.py (funciona sin histórico)
     - python apphistory.py (funciona con historico)
 
 APIs:
  - POST /ai: pregunta generica para LLM (no RAG)
- - POST /ask_pdf: pregunta sobre documentos cargados (RAG)
- - GET /list_pdfs: listado de documentos cargados
- - POST /embed_pdfs: carga de todos los PDFs existentes en el path
- - POST /add_pdf: carga de un PDF en concreto
+ - POST /ask_text: pregunta sobre documentos cargados (RAG)
+ - GET /list_db: listado de documentos cargados
+ - POST /add_text: carga de un TXT en concreto. Los .txt tienen que estar tagged (usar script doc_tagging.py)
 
 NOTAS:
     - embedding es el hecho de desgranar el documento (o el texto, o la frase, o el audio ...) y transformarlo en una representacion
     vectorial. Es el modo de transformar datos complejos en vectores numericos
     - una vez representados los datos en vectores, es necesario usar un "vector DB". Ejemplos son: Chromadb, qdrant, ...
     - indexing es el hecho de ordenar la representacion vectorial para optimizar la busqueda posterior de similitudes
-
-El siguiente enlace habla de cómo trabajar con Chromadb: https://realpython.com/chromadb-vector-database/
-
-Ideas de mejora: 
-    - fragmentar los PDF de junos en bloques segun tags ("generico", "features en acx", "bugs en acx", etc)
-    - embed estos bloques asignando un "context" (el género correspondiente según el tag)
-    - comprobar si la busqueda es más óptima
