@@ -97,9 +97,13 @@ def askTextPost():
 
     if intent[0] == "general_query":
         #request AI
-        response = requests.post('http://localhost:8080/ai', json=query)
-        print (f"Response to query is: {response}")
-        return response
+        llm_query = {
+            "query": f"{query}"
+        }        
+            
+        response = requests.post('http://localhost:8080/ai', json=llm_query)
+        print (f"Response to query is: {response.text}")
+        return response.text
     if intent[0] == "specific_junos":
         data_intent = extract_data_from_query(query)
         print (f"   data_intent is: {data_intent}")
@@ -162,12 +166,12 @@ def askTextPost():
         #return(response)
         
         #Send POST to LLM to summarize
-        query = {
+        llm_query = {
             "query": f"make a summary of the following text: {results['documents']}"
         }        
 
-        print(f"   query sent to LLM to summarize: {query}")
-        response = requests.post('http://localhost:8080/ai', json=query)
+        print(f"   query sent to LLM to summarize: {llm_query}")
+        response = requests.post('http://localhost:8080/ai', json=llm_query)
         print (f"Response to query is: {response.text}")
         return response.text
 
@@ -178,11 +182,14 @@ def askTextPost():
         print(response)
         return response
     else:
-        response = {
-            "status": "unknown intention", ##Maybe it sould go to /ai to run a general query
-        }
-        print(response)
-        return response
+        #request AI
+        llm_query = {
+            "query": f"{query}"
+        }     
+            
+        response = requests.post('http://localhost:8080/ai', json=llm_query)
+        print (f"Response to query is: {response.text}")
+        return response.text
 
     #curl -X 'POST' \
     #'http://127.0.0.1:8080/ask_text' \
