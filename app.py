@@ -1,66 +1,71 @@
-#from langchain_community.vectorstores import Chroma
-#from langchain_text_splitters import RecursiveCharacterTextSplitter
-#from langchain_community.embeddings.fastembed import FastEmbedEmbeddings
-#from langchain_community.document_loaders import PDFPlumberLoader
-#from langchain.chains.combine_documents import create_stuff_documents_chain
-#from langchain.chains import create_retrieval_chain
-
 from flask import Flask, request
-from langchain_community.llms import Ollama
-from langchain.prompts import PromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate
+#for instruct model
+from langchain_ollama import OllamaLLM
+#for chat model
+from langchain_ollama import ChatOllama
 
 import glob
 from doc_tagging import doc_tagging
-import chromadb
+import chromadb, re
 from chromadb.config import Settings
 from chromadb.utils import embedding_functions
+from pprint import pprint
 
-#Init of chroma db
-#Non persistent
+#Init of chroma db non-persistent
 #chroma_client = chromadb.Client()
-#Persistent
+#collection = chroma_client.get_or_create_collection(name="junos_releases_collection")
+#Init of chroma db persistent
 chroma_client = chromadb.PersistentClient(path="./db/")
 collection = chroma_client.get_or_create_collection(name="junos_releases_collection")
 
 #Init of App
 app = Flask("junos_release_analyzer")
-
 folder_path = "db"
 
-cached_llm = Ollama(model="llama3.2")
-
-#embedding = FastEmbedEmbeddings()
-
-#text_splitter = RecursiveCharacterTextSplitter(
-#    chunk_size=1024, chunk_overlap=80, length_function=len, is_separator_regex=False
-#)
-
-raw_prompt = PromptTemplate.from_template(
-    """ 
-    <s>[INST] You are a technical assistant good at searching docuemnts. If you do not have an answer from the provided information say so. [/INST] </s>
-    [INST] {input}
-           Context: {context}
-           Answer:
-    [/INST]
-"""
+#Init of LLAMA as chat
+model="llama3.2"
+temperature=0
+chat_ollama_model = ChatOllama(model=model, temperature=temperature)
+system_prompt = '''You are a technical assistant good at searching documents. If you do not have an answer from the provided information, say so.'''
+create_prompt = ChatPromptTemplate.from_messages(
+    [
+        ("system", system_prompt),
+        #
+        #MessagesPlaceholder("chat_history"),
+        #
+        ("user", "Question: {query}")
+    ]
 )
+format_answer = StrOutputParser()
+chat_ollama = create_prompt | chat_ollama_model | format_answer
 
+#Init of LLama as Instruct
+#ollama_llm = OllamaLLM(model=model)
+
+
+def format_output(text):
+    """Convert Markdown bold syntax to HTML strong tags."""
+    return re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', text)
 
 #Start with Flask routes
 @app.route("/ai", methods=["POST"])
 def aiPost():
+    '''AI route to ask LLM'''
     print("POST /ai called")
     json_content = request.json
     query = json_content.get("query")
 
     print(f"query: {query}")
 
-    response = cached_llm.invoke(query)
+    answer = chat_ollama.invoke({'query': query})
+    response = format_output(answer)
 
     print(response)
 
-    response_answer = {"answer": response}
-    return response_answer
+    #response_answer = {"answer": response['content']}
+    return response
 
     #Example curl
     #curl -X 'POST' \
@@ -68,11 +73,12 @@ def aiPost():
 	#    -H 'accept: application/json' \
 	#    -H 'Content-Type: application/json' \
 	#    -d ' {
-	#    "query": "how can you help me?"
+	#    "query": "why is the sky blue?"
 	#    }'
 
 @app.route("/ask_text", methods=["POST"])
 def askTextPost():
+    '''AI route to ask about the text'''
     print("POST /ask_text called")
     
     #identify the query
@@ -131,6 +137,7 @@ def askTextPost():
 
 @app.route("/list_db", methods=["GET"])
 def pdfList():
+    '''AI route to list entries in Chroma DB'''
     print("GET /list_db called")
     
     count = collection.count()
@@ -152,6 +159,7 @@ def pdfList():
 
 @app.route("/add_text", methods=["POST"])
 def pdfAddText():
+    '''AI route to upload a .txt to Chroma DB'''
     print("POST /add_text called")
 
     #tag the documents in ./txt/. This should be run in advance
@@ -176,10 +184,7 @@ def pdfAddText():
         for line in my_file:
             #print (f"line is: {line}")
             if line.startswith('<_tag_'):
-                #print(f"found tag: {line}")
                 #previous block
-                #print(f"block is: {block}")
-                #print(f"text2append is : {text2append}")
                 chunks.append(text2append)
                 metadatas = { 
                     "file": str(document), 
@@ -193,7 +198,6 @@ def pdfAddText():
                 text2append = ''
             else:
                 text2append = text2append + line
-                #print(f"line added to text2append: {text2append}")
 
     count = collection.count()
     collection.add(
@@ -215,6 +219,13 @@ def pdfAddText():
     #-d ' {
     #    "file": "junos-release-notes-22.3r1with_tags.txt"
     #}'
+
+@app.route("/add_pdf", methods=["POST"])
+def pdfAddPDF():
+    response = = {
+        "status": "API under construction",
+    }
+    return response
 
 #@app.route("/add_pdf", methods=["POST"])
 #def pdfAddPost():

@@ -23,3 +23,10 @@ NOTAS:
     vectorial. Es el modo de transformar datos complejos en vectores numericos
     - una vez representados los datos en vectores, es necesario usar un "vector DB". Ejemplos son: Chromadb, qdrant, ...
     - indexing es el hecho de ordenar la representacion vectorial para optimizar la busqueda posterior de similitudes
+
+Mejoras:
+    - borrado de base de datos
+    - ingestión de un conjunto de ficheros
+    - que el doc_tagging se ejecute automaticamente desde aqui 
+    - UI html 
+    - pasar respuesta a LLM para que éste la haga bonita
