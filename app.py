@@ -1,4 +1,5 @@
 from flask import Flask, request
+import requests
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 #for instruct model
@@ -12,6 +13,8 @@ import chromadb, re
 from chromadb.config import Settings
 from chromadb.utils import embedding_functions
 from pprint import pprint
+
+from get_intentions import calculate_intent_score, extract_data_from_query
 
 #Init of chroma db non-persistent
 #chroma_client = chromadb.Client()
@@ -57,7 +60,7 @@ def aiPost():
     json_content = request.json
     query = json_content.get("query")
 
-    print(f"query: {query}")
+    print(f"  Received query: {query}")
 
     answer = chat_ollama.invoke({'query': query})
     response = format_output(answer)
@@ -85,47 +88,101 @@ def askTextPost():
     json_content = request.json
     query = json_content.get("query")
 
-    print(f"query: {query}")
+    print(f"   query: {query}")
 
-    if "ACX" in query:
-        print("ACX query")
-        metadata = {
-            "file": "./txt/junos-release-notes-22.3r1with_tags.txt", #hard-coded - change it
-            "section": "ACX_newfeatures"
+    #identify the intent
+    intent = calculate_intent_score(query)
+
+    print(f"  intent is: {intent}")
+
+    if intent[0] == "general_query":
+        #request AI
+        response = requests.post('http://localhost:8080/ai', json=query)
+        print (f"Response to query is: {response}")
+        return response
+    if intent[0] == "specific_junos":
+        data_intent = extract_data_from_query(query)
+        print (f"   data_intent is: {data_intent}")
+        feature=data_intent[0]
+        version=data_intent[1]
+        platform=data_intent[2]
+        if "acx" in platform:
+            junos_release = ''.join(['./txt/junos-release-notes-',version.lower().strip(),'with_tags.txt'])
+            section = ''.join([platform.strip().upper(),feature.strip().replace('new features available','_newfeatures')])
+            metadata = {
+                "file": str(junos_release), #hard-coded - change it
+                "section": str(section)
+            }
+            #filter_word = "ACX"
+            print (f"metadata to look for is: {metadata}")
+
+        elif "mx" in platform:
+            junos_release = ''.join(['./txt/junos-release-notes-',version.lower().strip(),'with_tags.txt'])
+            section = ''.join([platform.strip().upper(),feature.strip().replace('new features available','_newfeatures')])
+            metadata = {
+                "file": str(junos_release), #hard-coded - change it
+                "section": str(section)
+            }
+            #filter_word = "MX"
+            print (f"metadata to look for is: {metadata}")
+
+        elif "qfx" in platform:
+            junos_release = ''.join(['./txt/junos-release-notes-',version.lower().strip(),'with_tags.txt'])
+            section = ''.join([platform.strip().upper(),feature.strip().replace('new features available','_newfeatures')])
+            metadata = {
+                "file": str(junos_release), #hard-coded - change it
+                "section": str(section)
+            }
+            #filter_word = "QFX"
+            print (f"metadata to look for is: {metadata}")        
+
+        #run the query to Chromadb
+        results=collection.query(
+            query_texts=query,
+            n_results=1,
+            where= {
+                "$and": [
+                    {
+                        "file": metadata['file']
+                    },
+                    {
+                        "section": metadata['section']
+                    }
+                ]
+            },
+            #where_document={"$contains": filter_word}
+        )
+
+        print(f"results is: {results}")
+        #response = {
+        #    "answer": results['documents'],
+        #    "distance": results['distances'],
+        #    "metadatas": results['metadatas']
+        #}
+        #return(response)
+        
+        #Send POST to LLM to summarize
+        query = {
+            "query": f"make a summary of the following text: {results['documents']}"
+        }        
+
+        print(f"   query sent to LLM to summarize: {query}")
+        response = requests.post('http://localhost:8080/ai', json=query)
+        print (f"Response to query is: {response.text}")
+        return response.text
+
+    elif intent[0] == "compare_junos":
+        response = {
+            "status": "Compare junos under construction",
         }
-        filter_word = "ACX"
-    if "MX" in query:
-        print("MX query")
-        metadata = {
-            "file": "./txt/junos-release-notes-22.3r1with_tags.txt", #hard-coded - change it
-            "section": "MX_newfeatures" #parece que al cargar se está metiendo on \n y luego no filtra bien
+        print(response)
+        return response
+    else:
+        response = {
+            "status": "unknown intention", ##Maybe it sould go to /ai to run a general query
         }
-        filter_word = "MX"
-
-    results=collection.query(
-        query_texts=query,
-        n_results=1,
-        where= {
-            "$and": [
-                {
-                    "file": metadata['file']
-                },
-                {
-                    "section": metadata['section']
-                }
-            ]
-        },
-        #where_document={"$contains": filter_word}
-    )
-
-    print(f"results is: {results}")
-
-    response = {
-        "answer": results['documents'],
-        "distance": results['distances'],
-        "metadatas": results['metadatas']
-    }
-    return(response)
+        print(response)
+        return response
 
     #curl -X 'POST' \
     #'http://127.0.0.1:8080/ask_text' \
@@ -222,7 +279,7 @@ def pdfAddText():
 
 @app.route("/add_pdf", methods=["POST"])
 def pdfAddPDF():
-    response = = {
+    response = {
         "status": "API under construction",
     }
     return response
