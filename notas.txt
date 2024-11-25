@@ -28,5 +28,3 @@ Mejoras:
     - borrado de base de datos
     - ingestión de un conjunto de ficheros
     - que el doc_tagging se ejecute automaticamente desde aqui 
-    - UI html 
-    - pasar respuesta a LLM para que éste la haga bonita

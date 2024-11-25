@@ -1,4 +1,4 @@
-from flask import Flask, request
+from flask import Flask, request, render_template, jsonify
 import requests
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
@@ -53,6 +53,12 @@ def format_output(text):
     return re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', text)
 
 #Start with Flask routes
+@app.route("/", methods=["GET"])
+def home():
+    '''Landing page'''
+    print("GET / called")
+    return render_template('index.html')
+
 @app.route("/ai", methods=["POST"])
 def aiPost():
     '''AI route to ask LLM'''
@@ -101,9 +107,14 @@ def askTextPost():
             "query": f"{query}"
         }        
             
-        response = requests.post('http://localhost:8080/ai', json=llm_query)
-        print (f"Response to query is: {response.text}")
-        return response.text
+        resp = requests.post('http://localhost:8080/ai', json=llm_query)
+        #print (f"Response to general query is: {response.text}")
+        #return response.text
+        response = {
+            'query' : resp.text
+        }        
+        print (f"Response to general query is: {response}")
+        return response
     if intent[0] == "specific_junos":
         data_intent = extract_data_from_query(query)
         print (f"   data_intent is: {data_intent}")
@@ -118,7 +129,7 @@ def askTextPost():
                 "section": str(section)
             }
             #filter_word = "ACX"
-            print (f"metadata to look for is: {metadata}")
+            print (f" acx metadata to look for is: {metadata}")
 
         elif "mx" in platform:
             junos_release = ''.join(['./txt/junos-release-notes-',version.lower().strip(),'with_tags.txt'])
@@ -128,7 +139,7 @@ def askTextPost():
                 "section": str(section)
             }
             #filter_word = "MX"
-            print (f"metadata to look for is: {metadata}")
+            print (f" mx metadata to look for is: {metadata}")
 
         elif "qfx" in platform:
             junos_release = ''.join(['./txt/junos-release-notes-',version.lower().strip(),'with_tags.txt'])
@@ -138,7 +149,7 @@ def askTextPost():
                 "section": str(section)
             }
             #filter_word = "QFX"
-            print (f"metadata to look for is: {metadata}")        
+            print (f" qfx metadata to look for is: {metadata}")        
 
         #run the query to Chromadb
         results=collection.query(
@@ -171,9 +182,16 @@ def askTextPost():
         }        
 
         print(f"   query sent to LLM to summarize: {llm_query}")
-        response = requests.post('http://localhost:8080/ai', json=llm_query)
-        print (f"Response to query is: {response.text}")
-        return response.text
+        resp = requests.post('http://localhost:8080/ai', json=llm_query)
+        
+        #print (f"Response to query is: {response.text}")
+        #return response.text
+        response = {
+            'query' : resp.text
+            #'query' : "this is a test"
+        }        
+        print (f"Response to specific query is\n: {response}")
+        return response
 
     elif intent[0] == "compare_junos":
         response = {
@@ -187,10 +205,20 @@ def askTextPost():
             "query": f"{query}"
         }     
             
-        response = requests.post('http://localhost:8080/ai', json=llm_query)
-        print (f"Response to query is: {response.text}")
-        return response.text
-
+        resp = requests.post('http://localhost:8080/ai', json=llm_query)
+        #print (f"Response to unknown query is: {response.text}")
+        #return response.text
+        #print (f"Type fo response to unknown query is: {type(response)}")
+        #print (f"Resp to unknown query is: {resp.text}")
+        
+        #must be transformed into json before being passed to JavaScript
+        response = {
+            'query' : resp.text
+            #'query' : "this is a test"
+        }
+        print (f"Response to unknown query is: {response}")
+        return response
+    
     #curl -X 'POST' \
     #'http://127.0.0.1:8080/ask_text' \
     #-H 'accept: application/json' \
@@ -200,7 +228,7 @@ def askTextPost():
     #}'
 
 @app.route("/list_db", methods=["GET"])
-def pdfList():
+def docList():
     '''AI route to list entries in Chroma DB'''
     print("GET /list_db called")
     
